@@ -181,6 +181,7 @@ func CmdParamToAction(cmd, param string) RobotAction {
 func DoPlayAnimation(animation string, robot *vector.Vector) error {
 	for _, animThing := range animationMap {
 		if animation == animThing[0] {
+			StartAnim_Queue(robot.Cfg.SerialNo)
 			robot.Conn.PlayAnimation(
 				context.Background(),
 				&vectorpb.PlayAnimationRequest{
@@ -190,6 +191,7 @@ func DoPlayAnimation(animation string, robot *vector.Vector) error {
 					Loops: 1,
 				},
 			)
+			StopAnim_Queue(robot.Cfg.SerialNo)
 			return nil
 		}
 	}
@@ -201,6 +203,7 @@ func DoPlayAnimationWI(animation string, robot *vector.Vector) error {
 	for _, animThing := range animationMap {
 		if animation == animThing[0] {
 			go func() {
+				StartAnim_Queue(robot.Cfg.SerialNo)
 				robot.Conn.PlayAnimation(
 					context.Background(),
 					&vectorpb.PlayAnimationRequest{
@@ -210,6 +213,7 @@ func DoPlayAnimationWI(animation string, robot *vector.Vector) error {
 						Loops: 1,
 					},
 				)
+				StopAnim_Queue(robot.Cfg.SerialNo)
 			}()
 			return nil
 		}
@@ -254,4 +258,66 @@ func PerformActions(actions []RobotAction, robot *vector.Vector) {
 			DoPlaySound(action.Parameter, robot)
 		}
 	}
+	WaitForAnim_Queue(robot.Cfg.SerialNo)
 }
+
+func WaitForAnim_Queue(esn string) {
+	for i, q := range AnimationQueues {
+		if q.ESN == esn {
+			if q.AnimCurrentlyPlaying {
+				for range AnimationQueues[i].AnimDone {
+					break
+				}
+				return
+			}
+		}
+	}
+}
+
+func StartAnim_Queue(esn string) {
+	// if animation is already playing, just wait for it to be done
+	for i, q := range AnimationQueues {
+		if q.ESN == esn {
+			if q.AnimCurrentlyPlaying {
+				for range AnimationQueues[i].AnimDone {
+					break
+				}
+				break
+			} else {
+				AnimationQueues[i].AnimCurrentlyPlaying = true
+			}
+			return
+		}
+	}
+	var aq AnimationQueue
+	aq.AnimCurrentlyPlaying = true
+	aq.AnimDone = make(chan bool)
+	aq.ESN = esn
+}
+
+func StopAnim_Queue(esn string) {
+	for i, q := range AnimationQueues {
+		if q.ESN == esn {
+			AnimationQueues[i].AnimCurrentlyPlaying = false
+			AnimationQueues[i].AnimDone <- true
+		}
+	}
+}
+
+// it would probably not be safe to remove one from the queue
+// func RemoveAnim_Queue(esn string) {
+// 	var newEqs []AnimationQueue
+// 	for i, q := range AnimationQueues {
+// 		if q.ESN != esn {
+// 			newEqs = append(newEqs, AnimationQueues[i])
+// 		}
+// 	}
+// }
+
+type AnimationQueue struct {
+	ESN                  string
+	AnimDone             chan bool
+	AnimCurrentlyPlaying bool
+}
+
+var AnimationQueues []AnimationQueue
