@@ -2,24 +2,11 @@ package main
 
 import (
 	"strconv"
-	"strings"
 	"time"
 )
 
-var Utterances = []string{"what day is it", "date today", "date", "what days it"}
+var Utterances = []string{"what day is it", "date today", "date", "what's today's date"}
 var Name = "Correct Date"
-
-func stripOutTriggerWords(s string) string {
-	result := strings.Replace(s, "simon says", "", 1)
-	result = strings.Replace(result, "repeat", "", 1)
-	return result
-}
-
-func CountWords(s string) int {
-	return len(strings.Fields(s))
-}
-
-//Example go plugin that give back the correct date
 
 func Action(transcribedText string, botSerial string, guid string, target string) (string, string) {
 	year, month, day := time.Now().Date()
